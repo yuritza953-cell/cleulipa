@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UnlimPlay — Discord Activity</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk@1.0.0/dist/index.min.js"></script>
+</head>
+<body>
+    <div class="discord-user" id="userInfo">
+        <img class="discord-avatar" id="userAvatar" src="" alt="">
+        <span id="userName"></span>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>🎬 H0L1M4C</h1>
+            <p>Películas, series y anime</p>
+        </header>
+
+        <div id="status" class="status">Iniciando…</div>
+        <div id="loading" class="loading" style="display: none;">Cargando…</div>
+
+        <div id="player" class="player-container">
+            <div class="player-header">
+                <div>
+                    <div class="player-title" id="playerTitle">Título</div>
+                    <div class="player-meta" id="playerMeta"></div>
+                </div>
+            </div>
+            <div class="player-wrapper" id="playerWrapper"></div>
+        </div>
+
+        <!-- Fallback si no hay pending del bot -->
+        <div class="manual-box" id="manualBox">
+            <label>Tipo</label>
+            <select id="manualType" style="width:100%;padding:10px 12px;background:#202225;border:1px solid #40444b;border-radius:8px;color:#dcddde;margin-bottom:10px;">
+                <option value="movie">Película</option>
+                <option value="tv">Serie / Anime</option>
+            </select>
+            <label>ID TMDB o IMDB</label>
+            <input type="text" id="manualId" placeholder="Ej: 502356 o tt1630029">
+            <label>Temporada (solo series)</label>
+            <input type="number" id="manualSeason" value="1" min="1">
+            <label>Episodio (solo series)</label>
+            <input type="number" id="manualEpisode" value="1" min="1">
+            <button class="btn" type="button" id="manualPlayBtn">▶️ Reproducir</button>
+        </div>
+    </div>
+
+    <script src="cid.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
