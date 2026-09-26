@@ -1,256 +1,239 @@
 /**
- * UnlimPlay Discord Activity
- * Bot API: https://camiloh-bot-v2.onrender.com
+ * UnlimPlay Discord Activity (ES module)
+ * El SDK va hosteado en el mismo repo (discord-sdk.mjs) para no depender de CDN.
  */
-(function () {
-  "use strict";
 
-  var BOT_API_BASE = "https://camiloh-bot-v2.onrender.com";
+import { DiscordSDK, patchUrlMappings } from "./discord-sdk.mjs";
 
-  var discordSdk = null;
-  var currentEmbedUrl = "";
+const IS_DISCORD = /discordsays\.com$/i.test(window.location.hostname);
 
-  function $(id) {
-    return document.getElementById(id);
-  }
+// Dentro de Discord: proxy. Fuera: URL directa del bot.
+const BOT_API_BASE = IS_DISCORD
+  ? "/.proxy/bot"
+  : "https://camiloh-bot-v2.onrender.com";
 
-  function setStatus(text, kind) {
-    var el = $("status");
-    if (!el) return;
-    el.textContent = text || "";
-    el.className = "status" + (kind ? " " + kind : "");
-  }
+const UNLIMPLAY_BASE = IS_DISCORD
+  ? "/.proxy/unlimplay"
+  : "https://unlimplay.com";
 
-  function setLoading(on) {
-    var el = $("loading");
-    if (el) el.style.display = on ? "block" : "none";
-  }
+let discordSdk = null;
 
-  function showPlayer(data) {
-    if (!data || !data.embed_url) return;
+function $(id) {
+  return document.getElementById(id);
+}
 
-    currentEmbedUrl = data.embed_url;
+function setStatus(text, kind) {
+  const el = $("status");
+  if (!el) return;
+  el.textContent = text || "";
+  el.className = "status" + (kind ? " " + kind : "");
+}
 
-    var titleEl = $("playerTitle");
-    var metaEl = $("playerMeta");
-    var wrapper = $("playerWrapper");
-    var player = $("player");
+function setLoading(on) {
+  const el = $("loading");
+  if (el) el.style.display = on ? "block" : "none";
+}
 
-    if (titleEl) titleEl.textContent = data.title || "Reproduciendo";
-
-    if (metaEl) {
-      if (data.type === "movie") {
-        metaEl.textContent = data.year ? String(data.year) : "";
-      } else {
-        var se = "T" + (data.season || "?") + "E" + (data.episode || "?");
-        metaEl.textContent = se + (data.year ? " · " + data.year : "");
-      }
+function toProxyEmbed(url) {
+  if (!url) return url;
+  try {
+    const u = new URL(url, window.location.origin);
+    if (u.hostname.includes("unlimplay.com") || url.includes("unlimplay.com")) {
+      const path = u.pathname || url.replace(/^https?:\/\/[^/]+/, "");
+      return UNLIMPLAY_BASE + path + (u.search || "");
     }
-
-    if (wrapper) {
-      wrapper.innerHTML =
-        '<iframe src="' +
-        data.embed_url +
-        '" allowfullscreen scrolling="no" ' +
-        'allow="autoplay; fullscreen; encrypted-media"></iframe>';
-    }
-
-    if (player) player.classList.add("active");
-    setStatus("Reproduciendo", "ok");
-    setLoading(false);
+  } catch (_) {}
+  // si ya es path relativo /f/embed/...
+  if (String(url).startsWith("/f/")) {
+    return UNLIMPLAY_BASE + url;
   }
+  return url;
+}
 
-  function loadPendingFromBot(channelId) {
-    if (!BOT_API_BASE || !channelId) {
-      return Promise.resolve(null);
-    }
-    var url =
-      BOT_API_BASE.replace(/\/$/, "") +
-      "/api/activity/pending?channel_id=" +
-      encodeURIComponent(channelId);
+function showPlayer(data) {
+  if (!data || !data.embed_url) return;
 
-    return fetch(url)
-      .then(function (res) {
-        return res.json();
-      })
-      .then(function (json) {
-        if (json && json.success && json.data && json.data.embed_url) {
-          return json.data;
-        }
-        return null;
-      })
-      .catch(function (err) {
-        console.log("pending fetch error:", err);
-        return null;
-      });
-  }
+  const embedUrl = toProxyEmbed(data.embed_url);
 
-  function parseQueryFallback() {
-    try {
-      var q = new URLSearchParams(window.location.search);
-      var type = q.get("type") || "movie";
-      var id = q.get("tmdb_id") || q.get("id");
-      if (!id) return null;
+  const titleEl = $("playerTitle");
+  const metaEl = $("playerMeta");
+  const wrapper = $("playerWrapper");
+  const player = $("player");
 
-      var season = parseInt(q.get("season") || "1", 10);
-      var episode = parseInt(q.get("episode") || "1", 10);
-      var base = "https://unlimplay.com/f/embed/";
-      var embed_url;
+  if (titleEl) titleEl.textContent = data.title || "Reproduciendo";
 
-      if (type === "movie") {
-        embed_url = base + "movie/" + id;
-      } else {
-        embed_url = base + "tv/" + id + "/" + season + "/" + episode;
-      }
-
-      return {
-        type: type,
-        tmdb_id: id,
-        season: season,
-        episode: episode,
-        title: q.get("title") || "Contenido",
-        embed_url: embed_url
-      };
-    } catch (_) {
-      return null;
+  if (metaEl) {
+    if (data.type === "movie") {
+      metaEl.textContent = data.year ? String(data.year) : "";
+    } else {
+      const se = "T" + (data.season || "?") + "E" + (data.episode || "?");
+      metaEl.textContent = se + (data.year ? " · " + data.year : "");
     }
   }
 
-  function initDiscord() {
-    setLoading(true);
-    setStatus("Conectando con Discord…");
-
-    var DiscordSDKCtor =
-      (window.DiscordSDK && window.DiscordSDK.DiscordSDK) ||
-      (window.DiscordSDK && window.DiscordSDK.default) ||
-      window.DiscordSDK;
-
-    if (!DiscordSDKCtor) {
-      setLoading(false);
-      setStatus("SDK de Discord no disponible. Abre esto como Activity.", "error");
-      tryManualFallback();
-      return;
-    }
-
-    try {
-      var appId =
-        window.__cid && typeof window.__cid.resolve === "function"
-          ? window.__cid.resolve()
-          : null;
-
-      if (!appId) {
-        setLoading(false);
-        setStatus("No se pudo resolver la aplicación.", "error");
-        return;
-      }
-
-      // Solo Client ID — nunca secret en el cliente
-      discordSdk = new DiscordSDKCtor(appId);
-
-      discordSdk
-        .ready()
-        .then(function () {
-          setStatus("Activity lista");
-
-          // Usuario (opcional)
-          if (discordSdk.commands && discordSdk.commands.getUser) {
-            return discordSdk.commands.getUser().then(function (user) {
-              var box = $("userInfo");
-              if (box && user) {
-                box.style.display = "flex";
-                var name = $("userName");
-                var avatar = $("userAvatar");
-                if (name) name.textContent = user.username || "";
-                if (avatar && user.id && user.avatar) {
-                  avatar.src =
-                    "https://cdn.discordapp.com/avatars/" +
-                    user.id +
-                    "/" +
-                    user.avatar +
-                    ".png";
-                }
-              }
-            }).catch(function () {});
-          }
-        })
-        .then(function () {
-          var channelId = discordSdk.channelId;
-          return loadPendingFromBot(channelId);
-        })
-        .then(function (pending) {
-          if (pending) {
-            showPlayer(pending);
-            return;
-          }
-          var fromQuery = parseQueryFallback();
-          if (fromQuery) {
-            showPlayer(fromQuery);
-            return;
-          }
-          setLoading(false);
-          setStatus("Esperando contenido… Usa /pelicula o /serie en el bot.");
-          var manual = $("manualBox");
-          if (manual) manual.classList.add("visible");
-        })
-        .catch(function (err) {
-          console.log("Discord ready error:", err);
-          setLoading(false);
-          setStatus("Error al iniciar Activity.", "error");
-          tryManualFallback();
-        });
-    } catch (err) {
-      console.log("initDiscord error:", err);
-      setLoading(false);
-      setStatus("No se pudo inicializar Discord SDK.", "error");
-      tryManualFallback();
-    }
+  if (wrapper) {
+    wrapper.innerHTML =
+      '<iframe src="' +
+      embedUrl +
+      '" allowfullscreen scrolling="no" ' +
+      'allow="autoplay; fullscreen; encrypted-media; picture-in-picture"></iframe>';
   }
 
-  function tryManualFallback() {
-    var fromQuery = parseQueryFallback();
-    if (fromQuery) {
-      showPlayer(fromQuery);
-      return;
+  if (player) player.classList.add("active");
+  setStatus("Reproduciendo", "ok");
+  setLoading(false);
+
+  const manual = $("manualBox");
+  if (manual) manual.classList.remove("visible");
+}
+
+async function loadPendingFromBot(channelId) {
+  if (!channelId) return null;
+  const url =
+    BOT_API_BASE.replace(/\/$/, "") +
+    "/api/activity/pending?channel_id=" +
+    encodeURIComponent(channelId);
+
+  console.log("Fetching pending:", url);
+  try {
+    const res = await fetch(url);
+    const json = await res.json();
+    console.log("Pending response:", json);
+    if (json && json.success && json.data && json.data.embed_url) {
+      return json.data;
     }
-    var manual = $("manualBox");
-    if (manual) manual.classList.add("visible");
+  } catch (err) {
+    console.log("pending fetch error:", err);
   }
+  return null;
+}
 
-  // Carga manual (si no hay pending del bot)
-  function manualPlay() {
-    var typeEl = $("manualType");
-    var idEl = $("manualId");
-    var seasonEl = $("manualSeason");
-    var epEl = $("manualEpisode");
+function parseQueryFallback() {
+  try {
+    const q = new URLSearchParams(window.location.search);
+    const type = q.get("type") || "movie";
+    const id = q.get("tmdb_id") || q.get("id");
+    if (!id) return null;
 
-    var type = typeEl ? typeEl.value : "movie";
-    var id = idEl ? idEl.value.trim() : "";
-    if (!id) {
-      setStatus("Ingresa un ID de TMDB o IMDB.", "error");
-      return;
-    }
-
-    var season = seasonEl ? parseInt(seasonEl.value || "1", 10) : 1;
-    var episode = epEl ? parseInt(epEl.value || "1", 10) : 1;
-    var base = "https://unlimplay.com/f/embed/";
-    var embed_url =
+    const season = parseInt(q.get("season") || "1", 10);
+    const episode = parseInt(q.get("episode") || "1", 10);
+    const embed_url =
       type === "movie"
-        ? base + "movie/" + id
-        : base + "tv/" + id + "/" + season + "/" + episode;
+        ? UNLIMPLAY_BASE + "/f/embed/movie/" + id
+        : UNLIMPLAY_BASE + "/f/embed/tv/" + id + "/" + season + "/" + episode;
 
-    showPlayer({
-      type: type,
+    return {
+      type,
       tmdb_id: id,
-      season: season,
-      episode: episode,
-      title: "ID " + id,
-      embed_url: embed_url
-    });
+      season,
+      episode,
+      title: q.get("title") || "Contenido",
+      embed_url,
+    };
+  } catch (_) {
+    return null;
   }
+}
 
-  document.addEventListener("DOMContentLoaded", function () {
-    var btn = $("manualPlayBtn");
-    if (btn) btn.addEventListener("click", manualPlay);
-    initDiscord();
+function showManual() {
+  const manual = $("manualBox");
+  if (manual) manual.classList.add("visible");
+}
+
+async function initDiscord() {
+  setLoading(true);
+  setStatus("Conectando con Discord…");
+
+  try {
+    if (IS_DISCORD) {
+      // Debe coincidir con los mappings del Developer Portal
+      patchUrlMappings(
+        [
+          { prefix: "/bot", target: "camiloh-bot-v2.onrender.com" },
+          { prefix: "/unlimplay", target: "unlimplay.com" },
+        ],
+        {
+          patchFetch: true,
+          patchWebSocket: true,
+          patchXhr: true,
+          patchSrcAttributes: true,
+        }
+      );
+    }
+
+    const appId =
+      window.__cid && typeof window.__cid.resolve === "function"
+        ? window.__cid.resolve()
+        : null;
+
+    if (!appId) {
+      setLoading(false);
+      setStatus("No se pudo resolver la aplicación.", "error");
+      showManual();
+      return;
+    }
+
+    discordSdk = new DiscordSDK(appId);
+    await discordSdk.ready();
+    setStatus("Activity lista");
+
+    console.log("SDK ready. channelId=", discordSdk.channelId, "guildId=", discordSdk.guildId);
+
+    const channelId = discordSdk.channelId;
+    let pending = await loadPendingFromBot(channelId);
+
+    if (!pending) {
+      pending = parseQueryFallback();
+    }
+
+    if (pending) {
+      showPlayer(pending);
+      return;
+    }
+
+    setLoading(false);
+    setStatus("Esperando contenido… Usa /pelicula o /serie en el bot y pulsa Reproducir.");
+    showManual();
+  } catch (err) {
+    console.error("initDiscord error:", err);
+    setLoading(false);
+    setStatus(
+      "Error al iniciar Activity: " + (err && err.message ? err.message : String(err)),
+      "error"
+    );
+    const fb = parseQueryFallback();
+    if (fb) showPlayer(fb);
+    else showManual();
+  }
+}
+
+function manualPlay() {
+  const type = ($("manualType") && $("manualType").value) || "movie";
+  const id = ($("manualId") && $("manualId").value.trim()) || "";
+  if (!id) {
+    setStatus("Ingresa un ID de TMDB o IMDB.", "error");
+    return;
+  }
+  const season = parseInt(($("manualSeason") && $("manualSeason").value) || "1", 10);
+  const episode = parseInt(($("manualEpisode") && $("manualEpisode").value) || "1", 10);
+
+  const embed_url =
+    type === "movie"
+      ? UNLIMPLAY_BASE + "/f/embed/movie/" + id
+      : UNLIMPLAY_BASE + "/f/embed/tv/" + id + "/" + season + "/" + episode;
+
+  showPlayer({
+    type,
+    tmdb_id: id,
+    season,
+    episode,
+    title: "ID " + id,
+    embed_url,
   });
-})();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const btn = $("manualPlayBtn");
+  if (btn) btn.addEventListener("click", manualPlay);
+  initDiscord();
+});
