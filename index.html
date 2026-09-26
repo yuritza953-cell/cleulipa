@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UnlimPlay — Discord Activity</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk@1.0.0/dist/index.min.js"></script>
 </head>
 <body>
     <div class="discord-user" id="userInfo">
@@ -15,8 +14,8 @@
 
     <div class="container">
         <header>
-            <h1>🎬 H0L1M4C</h1>
-            <p>Películas, series y anime</p>
+            <h1>🎬 UnlimPlay</h1>
+            <p>Películas, series y anime en Discord</p>
         </header>
 
         <div id="status" class="status">Iniciando…</div>
@@ -32,10 +31,9 @@
             <div class="player-wrapper" id="playerWrapper"></div>
         </div>
 
-        <!-- Fallback si no hay pending del bot -->
         <div class="manual-box" id="manualBox">
             <label>Tipo</label>
-            <select id="manualType" style="width:100%;padding:10px 12px;background:#202225;border:1px solid #40444b;border-radius:8px;color:#dcddde;margin-bottom:10px;">
+            <select id="manualType">
                 <option value="movie">Película</option>
                 <option value="tv">Serie / Anime</option>
             </select>
@@ -50,6 +48,7 @@
     </div>
 
     <script src="cid.js"></script>
-    <script src="app.js"></script>
+    <!-- Módulo ES: importa el SDK (requiere URL Mapping /esm → esm.sh en el portal) -->
+    <script type="module" src="app.js"></script>
 </body>
 </html>
