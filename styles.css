@@ -219,3 +219,14 @@ header p {
     header h1 { font-size: 1.5rem; }
     .discord-user { top: 8px; right: 8px; }
 }
+
+.manual-box select {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 1rem;
+    margin-bottom: 10px;
+}

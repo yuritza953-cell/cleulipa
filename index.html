@@ -3,8 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>UnlimPlay — Discord Activity</title>
-    <link rel="stylesheet" href="styles.css">
+    <!-- v=3 fuerza recarga de caché de Discord Activity -->
+    <link rel="stylesheet" href="styles.css?v=3">
 </head>
 <body>
     <div class="discord-user" id="userInfo">
@@ -47,8 +51,7 @@
         </div>
     </div>
 
-    <script src="cid.js"></script>
-    <!-- Módulo ES: importa el SDK (requiere URL Mapping /esm → esm.sh en el portal) -->
-    <script type="module" src="app.js"></script>
+    <script src="cid.js?v=3"></script>
+    <script type="module" src="app.js?v=3"></script>
 </body>
 </html>
